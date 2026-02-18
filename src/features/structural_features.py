@@ -323,27 +323,31 @@ class StructuralFeatureExtractor:
         """
         score = 100
         
-        # Deduct for clickbait indicators
-        score -= features.get('clickbait_pattern_count', 0) * 10
-        score -= features.get('headline_sensational_words', 0) * 5
+        # Deduct for clickbait indicators (max 20 points)
+        clickbait_deduction = min(20, features.get('clickbait_pattern_count', 0) * 8)
+        score -= clickbait_deduction
+        score -= min(10, features.get('headline_sensational_words', 0) * 3)
         
-        # Deduct for headline-body mismatch
-        score -= features.get('headline_body_mismatch', 0) * 30
+        # Deduct for headline-body mismatch (max 25 points)
+        score -= min(25, features.get('headline_body_mismatch', 0) * 25)
         
-        # Deduct for capitalization anomalies
-        score -= features.get('all_caps_word_ratio', 0) * 50
-        score -= features.get('consecutive_caps_count', 0) * 5
+        # Deduct for capitalization anomalies (max 20 points)
+        caps_deduction = features.get('all_caps_word_ratio', 0) * 40
+        score -= min(20, caps_deduction)
+        score -= min(5, features.get('consecutive_caps_count', 0) * 2)
         
-        # Deduct for punctuation manipulation
-        score -= features.get('multiple_exclamation_count', 0) * 3
-        score -= features.get('mixed_punctuation_count', 0) * 5
+        # Deduct for punctuation manipulation (max 15 points)
+        exclamation_deduction = features.get('multiple_exclamation_count', 0) * 1.5
+        score -= min(15, exclamation_deduction)
+        score -= min(8, features.get('mixed_punctuation_count', 0) * 3)
         
-        # Deduct for excessive repetition
-        score -= features.get('max_word_repetition_ratio', 0) * 30
+        # Deduct for excessive repetition (max 15 points)
+        repetition_deduction = features.get('max_word_repetition_ratio', 0) * 20
+        score -= min(15, repetition_deduction)
         
-        # Deduct for lack of citations
+        # Deduct for lack of citations (5 points)
         if features.get('source_reference_count', 0) == 0:
-            score -= 10
+            score -= 5
         
         return max(0, min(100, score))
     
