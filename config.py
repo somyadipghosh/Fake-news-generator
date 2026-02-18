@@ -75,3 +75,15 @@ EXPLAINABILITY_CONFIG = {
     'generate_plots': True,
     'save_explanations': True
 }
+
+# NewsAPI Configuration
+NEWS_API_CONFIG = {
+    'api_key': '35565331b65b4b23bd2208571f656a5f',
+    'base_url': 'https://newsapi.org/v2',
+    'sources': ['bbc-news', 'cnn', 'reuters', 'the-washington-post', 'the-new-york-times', 
+                'bloomberg', 'associated-press', 'national-geographic', 'scientific-american'],
+    'categories': ['business', 'technology', 'science', 'health', 'general'],
+    'language': 'en',
+    'country': 'us',
+    'page_size': 100
+}

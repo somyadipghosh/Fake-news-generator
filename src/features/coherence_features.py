@@ -41,16 +41,31 @@ class CoherenceFeatureExtractor:
         
         if len(sentences) < 2:
             return {
-                'avg_sentence_similarity': 0,
-                'min_sentence_similarity': 0,
-                'max_sentence_similarity': 0,
+                'avg_sentence_similarity': 0.5,  # Neutral default instead of 0
+                'min_sentence_similarity': 0.5,
+                'max_sentence_similarity': 0.5,
                 'sentence_similarity_std': 0,
-                'low_coherence_transitions': 0
+                'low_coherence_transitions': 0,
+                'low_coherence_ratio': 0
             }
         
         try:
+            # Filter out very short sentences
+            sentences = [s for s in sentences if len(s.split()) >= 3]
+            
+            if len(sentences) < 2:
+                return {
+                    'avg_sentence_similarity': 0.5,
+                    'min_sentence_similarity': 0.5,
+                    'max_sentence_similarity': 0.5,
+                    'sentence_similarity_std': 0,
+                    'low_coherence_transitions': 0,
+                    'low_coherence_ratio': 0
+                }
+            
             # Create TF-IDF vectors for sentences
-            vectorizer = TfidfVectorizer(max_features=1000, stop_words='english')
+            vectorizer = TfidfVectorizer(max_features=1000, stop_words='english', 
+                                        min_df=1, max_df=1.0)
             sentence_vectors = vectorizer.fit_transform(sentences)
             
             # Calculate similarity between consecutive sentences
@@ -61,27 +76,28 @@ class CoherenceFeatureExtractor:
                 similarities.append(sim)
             
             if similarities:
-                features['avg_sentence_similarity'] = np.mean(similarities)
-                features['min_sentence_similarity'] = np.min(similarities)
-                features['max_sentence_similarity'] = np.max(similarities)
-                features['sentence_similarity_std'] = np.std(similarities)
+                features['avg_sentence_similarity'] = float(np.mean(similarities))
+                features['min_sentence_similarity'] = float(np.min(similarities))
+                features['max_sentence_similarity'] = float(np.max(similarities))
+                features['sentence_similarity_std'] = float(np.std(similarities))
                 
                 # Count low coherence transitions (similarity < 0.1)
                 features['low_coherence_transitions'] = sum(1 for s in similarities if s < 0.1)
                 features['low_coherence_ratio'] = features['low_coherence_transitions'] / len(similarities)
             else:
-                features['avg_sentence_similarity'] = 0
-                features['min_sentence_similarity'] = 0
-                features['max_sentence_similarity'] = 0
+                features['avg_sentence_similarity'] = 0.5
+                features['min_sentence_similarity'] = 0.5
+                features['max_sentence_similarity'] = 0.5
                 features['sentence_similarity_std'] = 0
                 features['low_coherence_transitions'] = 0
                 features['low_coherence_ratio'] = 0
                 
         except Exception as e:
+            # Return neutral defaults on error
             features = {
-                'avg_sentence_similarity': 0,
-                'min_sentence_similarity': 0,
-                'max_sentence_similarity': 0,
+                'avg_sentence_similarity': 0.5,
+                'min_sentence_similarity': 0.5,
+                'max_sentence_similarity': 0.5,
                 'sentence_similarity_std': 0,
                 'low_coherence_transitions': 0,
                 'low_coherence_ratio': 0
@@ -97,44 +113,60 @@ class CoherenceFeatureExtractor:
         
         if len(sentences) < 3:
             return {
-                'topic_consistency_score': 0,
+                'topic_consistency_score': 0.5,  # Neutral default
                 'topic_drift': 0,
-                'intro_conclusion_similarity': 0
+                'intro_conclusion_similarity': 0.5
             }
         
         try:
             # Split document into sections
-            intro = ' '.join(sentences[:len(sentences)//3])
-            middle = ' '.join(sentences[len(sentences)//3:2*len(sentences)//3])
-            conclusion = ' '.join(sentences[2*len(sentences)//3:])
+            intro = ' '.join(sentences[:len(sentences)//3]) if len(sentences) >= 3 else text
+            middle = ' '.join(sentences[len(sentences)//3:2*len(sentences)//3]) if len(sentences) >= 3 else text
+            conclusion = ' '.join(sentences[2*len(sentences)//3:]) if len(sentences) >= 3 else text
             
-            sections = [intro, middle, conclusion]
+            sections = [s for s in [intro, middle, conclusion] if len(s.strip()) > 0]
+            
+            if len(sections) < 2:
+                return {
+                    'topic_consistency_score': 0.5,
+                    'topic_drift': 0,
+                    'intro_conclusion_similarity': 0.5
+                }
             
             # Create TF-IDF vectors for sections
-            vectorizer = TfidfVectorizer(max_features=500, stop_words='english')
+            vectorizer = TfidfVectorizer(max_features=500, stop_words='english',
+                                        min_df=1, max_df=1.0)
             section_vectors = vectorizer.fit_transform(sections)
             
             # Calculate pairwise similarities
-            intro_middle_sim = cosine_similarity(section_vectors[0:1], section_vectors[1:2])[0][0]
-            middle_conclusion_sim = cosine_similarity(section_vectors[1:2], section_vectors[2:3])[0][0]
-            intro_conclusion_sim = cosine_similarity(section_vectors[0:1], section_vectors[2:3])[0][0]
-            
-            # Topic consistency score
-            features['topic_consistency_score'] = np.mean([intro_middle_sim, 
-                                                           middle_conclusion_sim, 
-                                                           intro_conclusion_sim])
-            
-            # Topic drift (decrease in similarity from intro to conclusion)
-            features['topic_drift'] = max(0, intro_middle_sim - middle_conclusion_sim)
-            
-            # Intro-conclusion similarity (circular structure indicator)
-            features['intro_conclusion_similarity'] = intro_conclusion_sim
+            if len(sections) >= 3:
+                intro_middle_sim = cosine_similarity(section_vectors[0:1], section_vectors[1:2])[0][0]
+                middle_conclusion_sim = cosine_similarity(section_vectors[1:2], section_vectors[2:3])[0][0]
+                intro_conclusion_sim = cosine_similarity(section_vectors[0:1], section_vectors[2:3])[0][0]
+                
+                # Topic consistency score
+                features['topic_consistency_score'] = float(np.mean([intro_middle_sim, 
+                                                               middle_conclusion_sim, 
+                                                               intro_conclusion_sim]))
+                
+                # Topic drift (decrease in similarity from intro to conclusion)
+                features['topic_drift'] = float(max(0, intro_middle_sim - middle_conclusion_sim))
+                
+                # Intro-conclusion similarity (circular structure indicator)
+                features['intro_conclusion_similarity'] = float(intro_conclusion_sim)
+            else:
+                # Only 2 sections
+                sim = cosine_similarity(section_vectors[0:1], section_vectors[1:2])[0][0]
+                features['topic_consistency_score'] = float(sim)
+                features['topic_drift'] = 0
+                features['intro_conclusion_similarity'] = float(sim)
             
         except Exception as e:
+            # Return neutral defaults on error
             features = {
-                'topic_consistency_score': 0,
+                'topic_consistency_score': 0.5,
                 'topic_drift': 0,
-                'intro_conclusion_similarity': 0
+                'intro_conclusion_similarity': 0.5
             }
         
         return features
@@ -202,22 +234,22 @@ class CoherenceFeatureExtractor:
     def _get_empty_features(self):
         """Return empty feature dictionary"""
         return {
-            'avg_sentence_similarity': 0,
-            'min_sentence_similarity': 0,
-            'max_sentence_similarity': 0,
+            'avg_sentence_similarity': 0.5,  # Neutral defaults instead of 0
+            'min_sentence_similarity': 0.5,
+            'max_sentence_similarity': 0.5,
             'sentence_similarity_std': 0,
             'low_coherence_transitions': 0,
             'low_coherence_ratio': 0,
-            'topic_consistency_score': 0,
+            'topic_consistency_score': 0.5,
             'topic_drift': 0,
-            'intro_conclusion_similarity': 0,
+            'intro_conclusion_similarity': 0.5,
             'causal_marker_count': 0,
             'contrast_marker_count': 0,
             'addition_marker_count': 0,
             'temporal_marker_count': 0,
             'discourse_marker_density': 0,
             'logical_flow_score': 0,
-            'abrupt_transition_risk': 0
+            'abrupt_transition_risk': 1.0
         }
     
     def get_feature_names(self):

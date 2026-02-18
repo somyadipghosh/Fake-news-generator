@@ -18,16 +18,29 @@ def main():
     print("         FAKE NEWS DETECTION - QUICK TRAINING")
     print("="*70)
     
-    # Check for existing dataset
-    data_path = DATA_DIR / 'raw' / 'sample_news.csv'
+    # Check for augmented dataset first, then improved, then sample
+    data_paths = [
+        Path(DATA_DIR) / 'raw' / 'augmented_news.csv',
+        Path(DATA_DIR) / 'raw' / 'improved_news.csv',
+        Path(DATA_DIR) / 'raw' / 'sample_news.csv'
+    ]
     
-    if not data_path.exists():
-        print("\n❌ No dataset found. Please run train_example.py first to create sample data.")
+    data_path = None
+    for path in data_paths:
+        if path.exists():
+            data_path = path
+            break
+    
+    if not data_path:
+        print("\n❌ No dataset found.")
+        print("\n💡 Run this command first to create a dataset:")
+        print("   python augment_dataset.py")
         return
     
     print(f"\n📊 Loading dataset from {data_path}")
-    df = pd.read_data(data_path)
+    df = pd.read_csv(data_path)
     print(f"Dataset size: {len(df)}")
+    print(f"Real news: {len(df[df['label']==0])}, Fake news: {len(df[df['label']==1])}")
     
     # Initialize trainer
     print("\n🔧 Initializing trainer...")
@@ -43,7 +56,7 @@ def main():
     )
     
     print("\n✅ Training completed successfully!")
-    print(f"Model saved to: {MODELS_DIR / 'saved_models'}")
+    print(f"Model saved to: {Path(MODELS_DIR) / 'saved_models'}")
     print("\nYou can now run: python demo.py")
 
 if __name__ == "__main__":
